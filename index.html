@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>글자수 세기</title>
+<meta name="description" content="노션 임베드용 글자수 세기 — 공백 포함/제외 글자수와 바이트 수">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<script>
+  // 저장된 테마를 먼저 적용해 깜빡임 방지 (저장소가 막혀 있으면 시스템 설정을 따름)
+  try {
+    var t = localStorage.getItem("ncc:theme");
+    if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+  } catch (e) {}
+</script>
+<style>
+  :root {
+    --bg: #ffffff; --panel: #f7f7f5; --fg: #37352f; --muted: #787774; --faint: #9b9a97;
+    --border: #e9e9e7; --input: #ffffff; --track: #ebebe9;
+    --accent: #2383e2; --warn: #d44c47; --toast-bg: #37352f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #191919; --panel: #202020; --fg: #e9e9e7; --muted: #9b9b98; --faint: #8a8a87;
+      --border: #2f2f2f; --input: #1c1c1c; --track: #2f2f2f;
+      --accent: #529cca; --warn: #ff7369; --toast-bg: #3a3a38;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #191919; --panel: #202020; --fg: #e9e9e7; --muted: #9b9b98; --faint: #8a8a87;
+    --border: #2f2f2f; --input: #1c1c1c; --track: #2f2f2f;
+    --accent: #529cca; --warn: #ff7369; --toast-bg: #3a3a38;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); }
+  body {
+    color: var(--fg);
+    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    font-size: 14px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  textarea, input, button { font-family: inherit; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  .app {
+    position: relative;
+    min-height: 100%; height: 100%;
+    display: flex; flex-direction: column; gap: 10px;
+    padding: 14px;
+  }
+
+  /* 세그먼트 버튼 */
+  .seg {
+    display: inline-flex; padding: 2px; gap: 2px;
+    border: 1px solid var(--border); border-radius: 4px; background: var(--panel);
+  }
+  .seg button {
+    padding: 4px 10px; border: 0; border-radius: 3px; font-size: 12px; cursor: pointer;
+    background: transparent; color: var(--muted); font-weight: 400; white-space: nowrap;
+  }
+  .seg button[aria-pressed="true"] { background: var(--bg); color: var(--fg); box-shadow: var(--shadow); font-weight: 600; }
+
+  /* 목표 */
+  .goal {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px;
+    padding: 10px 12px; border: 1px solid var(--border); border-radius: 5px;
+  }
+  .goal-input { display: flex; align-items: center; gap: 6px; }
+  .goal-input label, .goal-input span { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .goal-input input {
+    width: 72px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 4px;
+    background: var(--input); color: var(--fg); font-size: 13px; text-align: right; outline: none;
+  }
+  .goal-input input:focus { border-color: var(--accent); }
+  .progress { flex: 1 1 170px; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+  .track { height: 6px; border-radius: 99px; background: var(--track); overflow: hidden; }
+  .bar { height: 100%; width: 0; border-radius: 99px; background: var(--accent); transition: width 120ms linear, background-color 120ms linear; }
+  .progress-text { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+  .cur { color: var(--accent); font-weight: 600; }
+  .rest { color: var(--fg); }
+  .rest.hint { color: var(--muted); }
+  .over-text { color: var(--warn); font-weight: 600; white-space: nowrap; }
+  .goal.over .cur { color: var(--warn); }
+  .goal.over .bar { background: var(--warn); }
+
+  /* 입력 */
+  textarea {
+    flex: 1 1 auto; width: 100%; min-height: 160px; resize: none;
+    padding: 12px 14px; border: 1px solid var(--border); border-radius: 5px;
+    background: var(--input); color: var(--fg); font-size: 14px; line-height: 1.7; outline: none;
+  }
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder, input::placeholder { color: var(--faint); }
+
+  /* 버튼 */
+  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .btn {
+    padding: 6px 12px; border: 1px solid var(--border); border-radius: 4px;
+    background: var(--bg); color: var(--fg); font-size: 13px; cursor: pointer;
+  }
+  .btn:hover, .seg button:hover { background: var(--panel); }
+  .seg button[aria-pressed="true"]:hover { background: var(--bg); }
+  .btn.theme { margin-left: auto; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .toast {
+    position: absolute; bottom: 56px; left: 50%; transform: translateX(-50%);
+    padding: 7px 14px; border-radius: 5px; font-size: 12px;
+    background: var(--toast-bg); color: #ffffff; white-space: nowrap;
+    opacity: 0; pointer-events: none; transition: opacity 160ms ease;
+  }
+  .toast.show { opacity: 1; }
+
+  .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+</style>
+</head>
+<body>
+<main class="app">
+  <section class="goal" id="goal">
+    <div class="goal-input">
+      <label for="goalInput">목표</label>
+      <input id="goalInput" class="num" type="text" inputmode="numeric" autocomplete="off" placeholder="500" aria-label="목표 글자수">
+      <span>자</span>
+    </div>
+    <div class="seg" role="group" aria-label="목표 글자수 기준">
+      <button type="button" data-basis="include" aria-pressed="true">공백 포함</button>
+      <button type="button" data-basis="exclude" aria-pressed="false">공백 제외</button>
+    </div>
+    <div class="progress">
+      <div class="track" role="progressbar" aria-label="목표 진행률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="track">
+        <div class="bar" id="bar"></div>
+      </div>
+      <div class="progress-text num" aria-live="polite">
+        <span><span class="cur" id="cur"></span><span class="rest hint" id="rest">목표 글자수를 입력하면 진행률이 표시됩니다</span></span>
+        <span class="over-text" id="over"></span>
+      </div>
+    </div>
+  </section>
+
+  <label for="text" class="sr-only">본문</label>
+  <textarea id="text" placeholder="여기에 글을 붙여넣으세요" spellcheck="false"></textarea>
+
+  <div class="actions">
+    <button type="button" class="btn" id="clearBtn" aria-label="입력한 글 전체 지우기">전체 지우기</button>
+    <button type="button" class="btn" id="copyBtn" aria-label="입력한 글 복사">텍스트 복사</button>
+    <button type="button" class="btn theme" id="themeBtn" aria-label="다크 모드로 전환">다크 모드</button>
+  </div>
+
+  <div class="toast" id="toast" role="status">복사했습니다</div>
+</main>
+
+<script id="count-lib">
+(function (root) {
+  "use strict";
+
+  // 한글 2byte 모드에서 줄바꿈 한 개의 바이트 수 (사람인 기준 2)
+  var NEWLINE_BYTES_KO2 = 2;
+
+  // 한 글자 = 한 코드 유닛이 확실한 문자만 있는 경우 (ASCII, 라틴-1, 완성형 한글, CJK 기호, 전각)
+  var SIMPLE_TEXT = /^[\u0000-\u00FF\u3000-\u303F\u3131-\u318E\uAC00-\uD7A3\uFF01-\uFF60]*$/;
+  var WHITESPACE = /[\s\u3000\u00A0]+/g;
+
+  var segmenter = null;
+  try {
+    if (typeof Intl !== "undefined" && Intl.Segmenter) segmenter = new Intl.Segmenter("ko", { granularity: "grapheme" });
+  } catch (e) { segmenter = null; }
+
+  function normalize(text) {
+    return String(text == null ? "" : text).replace(/\r\n?/g, "\n");
+  }
+
+  function graphemeLength(s) {
+    if (!s) return 0;
+    if (SIMPLE_TEXT.test(s)) return s.length;
+    if (segmenter) {
+      var n = 0;
+      var it = segmenter.segment(s)[Symbol.iterator]();
+      while (!it.next().done) n++;
+      return n;
+    }
+    return Array.from(s).length;
+  }
+
+  function countWithSpaces(text) {
+    return graphemeLength(normalize(text));
+  }
+
+  function countWithoutSpaces(text) {
+    return graphemeLength(normalize(text).replace(WHITESPACE, ""));
+  }
+
+  // 한글 2byte 모드: ASCII 1byte, 줄바꿈 NEWLINE_BYTES_KO2, 그 외 코드 포인트마다 2byte
+  // (이모지 "👍🏻"은 코드 포인트 2개라 4byte)
+  function bytesKo2(text) {
+    var s = normalize(text);
+    var b = 0;
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i);
+      if (c === 10) b += NEWLINE_BYTES_KO2;
+      else if (c <= 0x7f) b += 1;
+      else {
+        b += 2;
+        if (c >= 0xd800 && c <= 0xdbff && i + 1 < s.length) {
+          var d = s.charCodeAt(i + 1);
+          if (d >= 0xdc00 && d <= 0xdfff) i++;
+        }
+      }
+    }
+    return b;
+  }
+
+  var encoder = typeof TextEncoder !== "undefined" ? new TextEncoder() : null;
+
+  function bytesUtf8(text) {
+    var s = normalize(text);
+    if (encoder) return encoder.encode(s).length;
+    var b = 0;
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i);
+      if (c < 0x80) b += 1;
+      else if (c < 0x800) b += 2;
+      else if (c >= 0xd800 && c <= 0xdbff) { b += 4; i++; }
+      else b += 3;
+    }
+    return b;
+  }
+
+  function countBytes(text, mode) {
+    return mode === "utf8" ? bytesUtf8(text) : bytesKo2(text);
+  }
+
+  root.CharCount = {
+    NEWLINE_BYTES_KO2: NEWLINE_BYTES_KO2,
+    normalize: normalize,
+    countWithSpaces: countWithSpaces,
+    countWithoutSpaces: countWithoutSpaces,
+    bytesKo2: bytesKo2,
+    bytesUtf8: bytesUtf8,
+    countBytes: countBytes
+  };
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+
+<script>
+(function () {
+  "use strict";
+  var CC = window.CharCount;
+  var $ = function (id) { return document.getElementById(id); };
+
+  var store = {
+    get: function (k) { try { return window.localStorage.getItem("ncc:" + k); } catch (e) { return null; } },
+    set: function (k, v) { try { window.localStorage.setItem("ncc:" + k, v); } catch (e) {} }
+  };
+
+  var els = {
+    text: $("text"),
+    goal: $("goal"), goalInput: $("goalInput"), track: $("track"), bar: $("bar"),
+    cur: $("cur"), rest: $("rest"), over: $("over"),
+    toast: $("toast"), themeBtn: $("themeBtn")
+  };
+  var basisBtns = document.querySelectorAll("[data-basis]");
+
+  var state = {
+    basis: store.get("basis") === "exclude" ? "exclude" : "include"
+  };
+
+  var fmt = function (n) { return n.toLocaleString("en-US"); };
+
+  function update() {
+    var text = els.text.value;
+
+    var goal = parseInt(els.goalInput.value, 10);
+    var hasGoal = isFinite(goal) && goal > 0;
+    var cur = state.basis === "exclude" ? CC.countWithoutSpaces(text) : CC.countWithSpaces(text);
+    var pct = hasGoal ? (cur / goal) * 100 : 0;
+    var over = hasGoal && cur > goal;
+
+    els.goal.classList.toggle("over", over);
+    els.bar.style.width = Math.min(100, pct) + "%";
+    els.track.setAttribute("aria-valuenow", String(Math.min(100, Math.round(pct))));
+    els.cur.textContent = hasGoal ? fmt(cur) : "";
+    els.rest.textContent = hasGoal
+      ? " / " + fmt(goal) + "자 (" + Math.round(pct) + "%)"
+      : "목표 글자수를 입력하면 진행률이 표시됩니다";
+    els.rest.classList.toggle("hint", !hasGoal);
+    els.over.textContent = over ? fmt(cur - goal) + "자 초과" : "";
+  }
+
+  var frame = 0;
+  function scheduleUpdate() {
+    if (frame) return;
+    frame = requestAnimationFrame(function () { frame = 0; update(); });
+  }
+
+  var saveTimer = 0;
+  function saveTextSoon() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () { store.set("text", els.text.value); }, 300);
+  }
+
+  function syncPressed(nodes, attr, value) {
+    for (var i = 0; i < nodes.length; i++) {
+      nodes[i].setAttribute("aria-pressed", String(nodes[i].getAttribute(attr) === value));
+    }
+  }
+
+  // 테마
+  function currentTheme() {
+    var t = document.documentElement.getAttribute("data-theme");
+    if (t) return t;
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  function syncThemeBtn() {
+    var next = currentTheme() === "dark" ? "라이트" : "다크";
+    els.themeBtn.textContent = next + " 모드";
+    els.themeBtn.setAttribute("aria-label", next + " 모드로 전환");
+  }
+
+  // 복원
+  var savedText = store.get("text");
+  if (savedText) els.text.value = savedText;
+  var savedGoal = store.get("goal");
+  if (savedGoal && /^\d+$/.test(savedGoal)) els.goalInput.value = savedGoal;
+  syncPressed(basisBtns, "data-basis", state.basis);
+  syncThemeBtn();
+  update();
+
+  // 이벤트
+  els.text.addEventListener("input", function () { scheduleUpdate(); saveTextSoon(); });
+
+  els.goalInput.addEventListener("input", function () {
+    var v = els.goalInput.value.replace(/[^0-9]/g, "").replace(/^0+(?=\d)/, "").slice(0, 7);
+    if (v !== els.goalInput.value) els.goalInput.value = v;
+    store.set("goal", v);
+    update();
+  });
+
+  Array.prototype.forEach.call(basisBtns, function (btn) {
+    btn.addEventListener("click", function () {
+      state.basis = btn.getAttribute("data-basis");
+      store.set("basis", state.basis);
+      syncPressed(basisBtns, "data-basis", state.basis);
+      update();
+    });
+  });
+
+  $("clearBtn").addEventListener("click", function () {
+    els.text.value = "";
+    clearTimeout(saveTimer);
+    store.set("text", "");
+    update();
+    els.text.focus();
+  });
+
+  var toastTimer = 0;
+  function showToast(msg) {
+    els.toast.textContent = msg;
+    els.toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { els.toast.classList.remove("show"); }, 1500);
+  }
+
+  function fallbackCopy() {
+    var ta = els.text;
+    var start = ta.selectionStart, end = ta.selectionEnd;
+    ta.focus();
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    try { ta.setSelectionRange(start, end); } catch (e) {}
+    showToast(ok ? "복사했습니다" : "복사하지 못했습니다. Ctrl+C로 복사해 주세요");
+  }
+
+  $("copyBtn").addEventListener("click", function () {
+    var text = els.text.value;
+    if (!text) { showToast("복사할 글이 없습니다"); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { showToast("복사했습니다"); }, fallbackCopy);
+    } else {
+      fallbackCopy();
+    }
+  });
+
+  els.themeBtn.addEventListener("click", function () {
+    var next = currentTheme() === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    store.set("theme", next);
+    syncThemeBtn();
+  });
+
+  if (window.matchMedia) {
+    var mq = window.matchMedia("(prefers-color-scheme: dark)");
+    if (mq.addEventListener) mq.addEventListener("change", syncThemeBtn);
+    else if (mq.addListener) mq.addListener(syncThemeBtn);
+  }
+})();
+</script>
+</body>
+</html>
