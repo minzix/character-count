@@ -79,7 +79,6 @@
     width: 72px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 4px;
     background: var(--input); color: var(--fg); font-size: 13px; text-align: right; outline: none;
   }
-  .goal-input input:focus { border-color: var(--accent); }
   .progress { flex: 1 1 170px; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
   .track { height: 6px; border-radius: 99px; background: var(--track); overflow: hidden; }
   .bar { height: 100%; width: 0; border-radius: 99px; background: var(--accent); transition: width 120ms linear, background-color 120ms linear; }
@@ -97,7 +96,6 @@
     padding: 12px 14px; border: 1px solid var(--border); border-radius: 5px;
     background: var(--input); color: var(--fg); font-size: 14px; line-height: 1.7; outline: none;
   }
-  textarea:focus { border-color: var(--accent); }
   textarea::placeholder, input::placeholder { color: var(--faint); }
 
   /* 버튼 */
@@ -109,7 +107,7 @@
   .btn:hover, .seg button:hover { background: var(--panel); }
   .seg button[aria-pressed="true"]:hover { background: var(--bg); }
   .btn.theme { margin-left: auto; }
-  button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
   .toast {
     position: absolute; bottom: 56px; left: 50%; transform: translateX(-50%);
