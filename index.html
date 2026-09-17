@@ -6,13 +6,6 @@
 <title>글자수 세기</title>
 <meta name="description" content="노션 임베드용 글자수 세기 — 공백 포함/제외 글자수와 바이트 수">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<script>
-  // 저장된 테마를 먼저 적용해 깜빡임 방지 (저장소가 막혀 있으면 시스템 설정을 따름)
-  try {
-    var t = localStorage.getItem("ncc:theme");
-    if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
-  } catch (e) {}
-</script>
 <style>
   :root {
     --bg: #ffffff; --panel: #f7f7f5; --fg: #37352f; --muted: #787774; --faint: #9b9a97;
@@ -20,22 +13,6 @@
     --accent: #2383e2; --warn: #d44c47; --toast-bg: #37352f;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
     color-scheme: light;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #191919; --panel: #202020; --fg: #e9e9e7; --muted: #9b9b98; --faint: #8a8a87;
-      --border: #2f2f2f; --input: #1c1c1c; --track: #2f2f2f;
-      --accent: #529cca; --warn: #ff7369; --toast-bg: #3a3a38;
-      --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-      color-scheme: dark;
-    }
-  }
-  :root[data-theme="dark"] {
-    --bg: #191919; --panel: #202020; --fg: #e9e9e7; --muted: #9b9b98; --faint: #8a8a87;
-    --border: #2f2f2f; --input: #1c1c1c; --track: #2f2f2f;
-    --accent: #529cca; --warn: #ff7369; --toast-bg: #3a3a38;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-    color-scheme: dark;
   }
 
   * { box-sizing: border-box; }
@@ -106,7 +83,6 @@
   }
   .btn:hover, .seg button:hover { background: var(--panel); }
   .seg button[aria-pressed="true"]:hover { background: var(--bg); }
-  .btn.theme { margin-left: auto; }
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
   .toast {
@@ -150,7 +126,6 @@
   <div class="actions">
     <button type="button" class="btn" id="clearBtn" aria-label="입력한 글 전체 지우기">전체 지우기</button>
     <button type="button" class="btn" id="copyBtn" aria-label="입력한 글 복사">텍스트 복사</button>
-    <button type="button" class="btn theme" id="themeBtn" aria-label="다크 모드로 전환">다크 모드</button>
   </div>
 
   <div class="toast" id="toast" role="status">복사했습니다</div>
@@ -263,7 +238,7 @@
     text: $("text"),
     goal: $("goal"), goalInput: $("goalInput"), track: $("track"), bar: $("bar"),
     cur: $("cur"), rest: $("rest"), over: $("over"),
-    toast: $("toast"), themeBtn: $("themeBtn")
+    toast: $("toast")
   };
   var basisBtns = document.querySelectorAll("[data-basis]");
 
@@ -311,25 +286,12 @@
     }
   }
 
-  // 테마
-  function currentTheme() {
-    var t = document.documentElement.getAttribute("data-theme");
-    if (t) return t;
-    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  }
-  function syncThemeBtn() {
-    var next = currentTheme() === "dark" ? "라이트" : "다크";
-    els.themeBtn.textContent = next + " 모드";
-    els.themeBtn.setAttribute("aria-label", next + " 모드로 전환");
-  }
-
   // 복원
   var savedText = store.get("text");
   if (savedText) els.text.value = savedText;
   var savedGoal = store.get("goal");
   if (savedGoal && /^\d+$/.test(savedGoal)) els.goalInput.value = savedGoal;
   syncPressed(basisBtns, "data-basis", state.basis);
-  syncThemeBtn();
   update();
 
   // 이벤트
@@ -387,19 +349,6 @@
       fallbackCopy();
     }
   });
-
-  els.themeBtn.addEventListener("click", function () {
-    var next = currentTheme() === "dark" ? "light" : "dark";
-    document.documentElement.setAttribute("data-theme", next);
-    store.set("theme", next);
-    syncThemeBtn();
-  });
-
-  if (window.matchMedia) {
-    var mq = window.matchMedia("(prefers-color-scheme: dark)");
-    if (mq.addEventListener) mq.addEventListener("change", syncThemeBtn);
-    else if (mq.addListener) mq.addListener(syncThemeBtn);
-  }
 })();
 </script>
 </body>
